@@ -1,0 +1,1 @@
+lmql serve-model "TheBloke/Wizard-Vicuna-30B-Uncensored-GPTQ" --device_map "auto" --cuda --use_safetensors True --trust_remote_code True --do_sample True --loader "autogptq" --revision "gptq-4bit-128g-actorder_True"
