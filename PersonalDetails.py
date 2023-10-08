@@ -260,7 +260,15 @@ def generateComments(currentUser, commentUsers, numComments):
                 #prompt = f"You've posted this exercise log: {workoutWithTwoCurlyBraces} \n You've forgotten to mention something in your exercise notes. Use I and not You since you're talking about yourself:"          
         else:
             prompt = f"{currentUser['personalData']['online_handle']}'s exercise log:{workoutWithTwoCurlyBraces} \n Your personality type is {currentUser['personalData']['oneAdjectiveToDescribeMe']}. Write a comment on their exercise log. Mention something specific:"
-        outputComment = exerciseLogComment(prompt, author)[0].prompt
+        
+        outputComment = ""
+        while not outputComment:
+            try:
+                outputComment = exerciseLogComment(prompt, author)[0].prompt
+            except ValueError:
+                print("ValueError: ", ValueError)
+                print("prompt: ", prompt)
+                print("author: ", author)
         formattedComment = formatJson(prompt, outputComment)
         jsonComment = parseJsonSafely(formattedComment)
         print(f"{currentUser['personalData']['online_handle']} commented on {author['personalData']['online_handle']}'s exercise log: {jsonComment['comment']}")
@@ -300,7 +308,7 @@ def saveData():
         json.dump(dataGen, outfile, indent=2)
         print("Saved data to: ", outputFile)
 
-#generateUsers(5)
+generateUsers(100)
 # set id for each user being their index in the array
 for i in range(len(users)):
     users[i]["id"] = i
