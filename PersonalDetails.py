@@ -94,7 +94,7 @@ def exerciseLogComment(prompt, author):
     sample(temperature=1.3)
         """{prompt}
         {{
-            "author_id": {author["id"]},
+            "author_id": "{author["id"]}",
             "author": "{author["personalData"]["online_handle"]}",
             "comment": "[STRING_VALUE]",
             "isLookingForReplyFromAuthor": "[BOOLEAN_VALUE]",
@@ -160,14 +160,26 @@ def formatJson(prompt, json):
 
     return json
 
-# INT(INT_VALUE) and len(TOKENS(INT_VALUE)) == 2
+# returns a real domain like @gmail.com, @yahoo.com, ...
+emailDomainList = ["@gmail.com", "@yahoo.com", "@hotmail.com", "@outlook.com", "@aol.com", "@icloud.com", "@protonmail.com", "@zoho.com", "@yandex.com", "@mail.com", "@gmx.com", "@tutanota.com", "@mail.ru", "@inbox.com", "@gmx.us"]
 
 def generateUsers(numUsers):
     for i in range(numUsers):
         print(f"Generating user: {i} of {numUsers}")
-        userJson = generateUserJson()
-        users.append(json.loads(userJson))
+        userJsonString = generateUserJson()
+        userJson = parseJsonSafely(userJsonString)
+        
+        # scan emails for example.com and replace with random domain
+        # for range i
+        for i in range(len(userJson["personalData"]["emails"])):
+            # if email contains example.com
+            if("@example.com" in userJson["personalData"]["emails"][i]):
+                # replace with random domain
+                userJson["personalData"]["emails"][i] = userJson["personalData"]["emails"][i].replace("@example.com", random.choice(emailDomainList))
+            
+
         print(userJson)
+        users.append(userJson)
         # every 5 users, save data
         if(i % 5 == 0):
             saveData()
@@ -175,7 +187,8 @@ def generateUsers(numUsers):
 
 
 def generateUserJson():
-    prompt = "Write a summary of a random real person's personal information:"
+    prompt = "You've been asked to fill in the following with your personal information. Use first person pronouns (I, me, my, mine, myself). Fill in the following information about yourself:"
+    #prompt = "Write a summary of a random real person's personal information:"
     #prompt = "Write a summary of a random real person’s personal information, such as their name (e.g., Maria Garcia, James Smith, or Wei Zhang), email (e.g., mgarcia@gmail.com, james.smith@yahoo.com, or wei.zhang@hotmail.com):"
     outputUserJson = personalDetailsPrompt(prompt)[0].prompt
     formattedUserJson = formatJson(prompt, outputUserJson)
@@ -195,19 +208,28 @@ def generateExerciseLogs(users):
 
 def printUserInfo(userInfo):
     print(f"User: {userInfo['firstName']} {userInfo['lastName']} aka {userInfo['online_handle']}\nAge: {userInfo['age']} Height: {userInfo['height']} Weight: {userInfo['weight']}\n About me: {userInfo['aboutMe']} One adjective to describe me: {userInfo['oneAdjectiveToDescribeMe']}\n")
-# generateUsers(2)
+
+def parseJsonSafely(jsonString):
+    # Remove invalid control characters
+    jsonString = ''.join(c for c in jsonString if c.isprintable())
+    return json.loads(jsonString)
+
+
 def generateExerciseLog(userInfo):
     print("Generating exercise log for user: ")
     printUserInfo(userInfo)
     # activities: [{ date: "", workout: {type:'run/bike/walk/cardio/strength', distance: 0, duration: 0, avgPace: 0, calories: 0, location: "" }}]
-    prompt = f"Write an exercise log of a {userInfo['genderIdentity']} {userInfo['age']} year old who's in the {userInfo['weight_class']} weight class. They wrote this about themselves \"{userInfo['aboutMe']}\" and descibe themselves as {userInfo['oneAdjectiveToDescribeMe']}.\nExercise Log:"
+    #prompt = f"Write an exercise log of a {userInfo['genderIdentity']} {userInfo['age']} year old who's in the {userInfo['weight_class']} weight class. They wrote this about themselves \"{userInfo['aboutMe']}\" and descibe themselves as {userInfo['oneAdjectiveToDescribeMe']}.\nExercise Log:"
+    prompt = f"You're tasked with writing an exercise log. You are a {userInfo['genderIdentity']} {userInfo['age']} year old who's in the {userInfo['weight_class']} weight class. Your self written description of yourself is \"{userInfo['aboutMe']}\" and you frequently describe yourself as {userInfo['oneAdjectiveToDescribeMe']}.\nExercise Log:"
+    
     numberOfWorkouts = random.randint(1, 4)
     outputExerciseLog = exerciseLogPrompt(prompt, numberOfWorkouts)[0].prompt
     # remove trailing comma and close array with ]
     outputExerciseLog = outputExerciseLog[:-1] + "]"
     formattedExerciseLog = formatJson(prompt, outputExerciseLog)
     print(formattedExerciseLog)
-    return json.loads(formattedExerciseLog)
+    
+    return parseJsonSafely(formattedExerciseLog)
 
 def generateComments(currentUser, commentUsers, numComments):
     comments = []
@@ -232,7 +254,7 @@ def generateComments(currentUser, commentUsers, numComments):
 
                 # prompt: You've posted an exercise log. This is a comment on your exercise log. Mention something specific:
                 #prompt = f"Comment: {commentToReplyTo['comment']} \n You've posted an exercise log. This is a comment on your exercise log. Respond to the comment:"
-                prompt = f"You are playing the role of {currentUser['personalData']['online_handle']} who is Your personality type is {currentUser['personalData']['oneAdjectiveToDescribeMe']}. \nComment: {commentToReplyTo['author']} commented on your exercise log! They said {commentToReplyTo['comment']} \n They want a reply from you. \nRespond to the comment:"
+                prompt = f"You are playing the role of a user named {currentUser['personalData']['online_handle']}. Your personality type is {currentUser['personalData']['oneAdjectiveToDescribeMe']}. \nComment: {commentToReplyTo['author']} commented on your exercise log! They said \"{commentToReplyTo['comment']}\" \n They want a reply from you. \nRespond to the comment:"
             else:
                 continue # don't comment for your own exercise log (for now)
                 #prompt = f"You've posted this exercise log: {workoutWithTwoCurlyBraces} \n You've forgotten to mention something in your exercise notes. Use I and not You since you're talking about yourself:"          
@@ -240,7 +262,9 @@ def generateComments(currentUser, commentUsers, numComments):
             prompt = f"{currentUser['personalData']['online_handle']}'s exercise log:{workoutWithTwoCurlyBraces} \n Your personality type is {currentUser['personalData']['oneAdjectiveToDescribeMe']}. Write a comment on their exercise log. Mention something specific:"
         outputComment = exerciseLogComment(prompt, author)[0].prompt
         formattedComment = formatJson(prompt, outputComment)
-        comments.append(json.loads(formattedComment))
+        jsonComment = parseJsonSafely(formattedComment)
+        print(f"{currentUser['personalData']['online_handle']} commented on {author['personalData']['online_handle']}'s exercise log: {jsonComment['comment']}")
+        comments.append(jsonComment)
     return comments
 
 
@@ -250,6 +274,7 @@ def getRandomUsers(users, numUsers):
 def generateExerciseLogsComments(users):
     numberOfCommentsGenerated = 0
     tempCommentCount = 0
+    print("Generating comments for exercise logs")
     for user in users:
         userInfo = user.get("personalData")
         if(userInfo.get("activities") != None):
@@ -262,7 +287,8 @@ def generateExerciseLogsComments(users):
                     randomUsers = getRandomUsers(users, numComments)
                     comment = generateComments(user, randomUsers, numComments)
                     activity["workout"]["comments"] = comment
-                    print(f"Generated comments for user: {userInfo['online_handle']} \n {comment['author']}: {comment['comment']}")
+                    printUserInfo(userInfo)
+                    #print(f"Generated comments for user: {userInfo['online_handle']} \n {comment['author']}: {comment['comment']}")
                     numberOfCommentsGenerated += numComments
                     
                 if(tempCommentCount != numberOfCommentsGenerated): # if comments were generated
@@ -274,12 +300,12 @@ def saveData():
         json.dump(dataGen, outfile, indent=2)
         print("Saved data to: ", outputFile)
 
-#generateUsers(100)
+#generateUsers(5)
 # set id for each user being their index in the array
 for i in range(len(users)):
     users[i]["id"] = i
 generateExerciseLogs(users)
-print(users)
+
 # generate comments for each exercise log
 # Use different users to generate comments
 generateExerciseLogsComments(users)
